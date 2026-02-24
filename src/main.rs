@@ -1,7 +1,7 @@
 use async_openai::{Client, config::OpenAIConfig};
 use clap::Parser;
 use serde_json::{Value, json};
-use std::{env, process};
+use std::{env, fs, process};
 
 #[derive(Parser)]
 #[command(author, version, about)]
@@ -60,7 +60,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ]
         }))
         .await?;
+    let message = &response["choices"][0]["message"];
 
+    if let Some(tool_calls) = message["tool_calls"].as_array() {
+        for call in tool_calls {
+            let func = &call["function"];
+            let func_name = func["name"].as_str().unwrap_or("");
+            if func_name == "Read" {
+                // Get file_path argument
+                let args_str = func["arguments"].as_str().unwrap_or("{}");
+                let args_json: Value = serde_json::from_str(args_str)?;
+                let file_path = args_json["file_path"].as_str().unwrap_or("");
+
+                // Read file content
+                let content = fs::read_to_string(file_path)
+                    .unwrap_or_else(|_| "Error reading file".to_string());
+
+                // Print content (this is what the test expects)
+                println!("{}", content);
+            }
+        }
+    } else if let Some(content) = message["content"].as_str() {
+        println!("{}", content);
+    }
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     eprintln!("Logs from your program will appear here!");
 
