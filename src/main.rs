@@ -72,7 +72,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
+    },
+    {
+    "type": "function",
+    "function": {
+        "name": "Bash",
+        "description": "Execute a shell command",
+        "parameters": {
+            "type": "object",
+            "required": ["command"],
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The command to execute"
+                }
+            }
+        }
     }
+}
 ],
             }))
             .await?;
@@ -124,6 +141,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "content": format!("Created the file {}", file_path)
                     }));
                 }
+                "Bash" => {
+                    let command = args["command"].as_str().expect("command must be a string");
+
+                    // Execute the command
+                    use std::process::Command;
+                    let output = Command::new("sh").arg("-c").arg(command).output();
+
+                    let result = match output {
+                        Ok(out) => {
+                            let stdout = String::from_utf8_lossy(&out.stdout);
+                            let stderr = String::from_utf8_lossy(&out.stderr);
+                            if !stderr.is_empty() {
+                                format!("Error: {}", stderr)
+                            } else {
+                                stdout.to_string()
+                            }
+                        }
+                        Err(e) => format!("Failed to execute command: {}", e),
+                    };
+
+                    // Push tool response to messages
+                    messages.push(json!({
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": result
+                    }));
+                }
                 _ => panic!("Tool not implemented"),
             }
         } else {
@@ -135,4 +179,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     Ok(())
 }
-
