@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             ],
             "model": "anthropic/claude-haiku-4.5",
-             "tools": [
+            "tools": [
                 {
                     "type": "function",
                     "function": {
@@ -48,10 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "parameters": {
                             "type": "object",
                             "properties": {
-                                "file_path": {
-                                    "type": "string",
-                                    "description": "The path to the file to read"
-                                }
+                                "file_path": { "type": "string" }
                             },
                             "required": ["file_path"]
                         }
@@ -60,6 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ]
         }))
         .await?;
+
     let message = &response["choices"][0]["message"];
 
     if let Some(tool_calls) = message["tool_calls"].as_array() {
@@ -92,4 +90,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-
