@@ -40,25 +40,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .create_byot(json!({
                 "messages": messages,
                 "model": "anthropic/claude-haiku-4.5",
-                "tools": [
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "Read",
-                            "description": "Read and return the contents of a file",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "file_path": {
-                                        "type": "string",
-                                        "description": "The path of the file to read",
-                                    },
-                                },
-                            },
-                            "required": ["file_path"]
-                        },
-                    },
-                ],
+            "tools": [
+    {
+        "type": "function",
+        "function": {
+            "name": "Read",
+            "description": "Read and return the contents of a file",
+            "parameters": {
+    "type": "object",
+    "required": ["file_path"],
+    "properties": {
+        "file_path": {
+            "type": "string",
+            "description": "The path of the file to read"
+        }
+    }
+}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "Write",
+            "description": "Write content to a file",
+            "parameters": {
+                "type": "object",
+                "required": ["file_path", "content"],
+                "properties": {
+                    "file_path": { "type": "string", "description": "The path of the file to write to" },
+                    "content": { "type": "string", "description": "The content to write to the file" }
+                }
+            }
+        }
+    }
+],
             }))
             .await?;
 
@@ -85,18 +100,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             match tool.as_str() {
                 "Read" => {
                     if let Value::String(path) = &args["file_path"] {
-                        let content = fs::read_to_string(path).unwrap();
+                        let content = fs::read_to_string(path).unwrap_or_default();
                         messages.push(json!({
                             "role": "tool",
                             "tool_call_id": tool_call_id,
                             "content": content,
-                        }))
-                    } else {
-                        panic!("file_path must be a string")
+                        }));
                     }
                 }
+                "Write" => {
+                    let file_path = args["file_path"]
+                        .as_str()
+                        .expect("file_path must be a string");
+                    let content = args["content"].as_str().expect("content must be a string");
+
+                    // Write content to file (create if not exists, overwrite if exists)
+                    fs::write(file_path, content).expect("Failed to write file");
+
+                    // Append the tool result to messages
+                    messages.push(json!({
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": format!("Created the file {}", file_path)
+                    }));
+                }
                 _ => panic!("Tool not implemented"),
-            };
+            }
         } else {
             if let Some(content) = response["choices"][0]["message"]["content"].as_str() {
                 println!("{}", content);
@@ -106,3 +135,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     Ok(())
 }
+
