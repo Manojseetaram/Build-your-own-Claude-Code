@@ -28,61 +28,81 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = Client::with_config(config);
 
-    #[allow(unused_variables)]
-    let response: Value = client
-        .chat()
-        .create_byot(json!({
-            "messages": [
-                {
-                    "role": "user",
-                    "content": args.prompt
-                }
-            ],
-            "model": "anthropic/claude-haiku-4.5",
-            "tools": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "Read",
-                        "description": "Read and return the contents of a file",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "file_path": { "type": "string" }
+    let mut messages: Vec<Value> = Vec::new();
+    messages.push(json!({
+            "role": "user",
+            "content": args.prompt
+        }
+    ));
+    for _ in 0..10 {
+        let response: Value = client
+            .chat()
+            .create_byot(json!({
+                "messages": messages,
+                "model": "anthropic/claude-haiku-4.5",
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "Read",
+                            "description": "Read and return the contents of a file",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "file_path": {
+                                        "type": "string",
+                                        "description": "The path of the file to read",
+                                    },
+                                },
                             },
                             "required": ["file_path"]
-                        }
+                        },
+                    },
+                ],
+            }))
+            .await?;
+
+        if let Some(tools) = response["choices"][0]["message"]["tool_calls"].as_array()
+            && !tools.is_empty()
+        {
+            messages.push(response["choices"][0]["message"].clone());
+            let tool_call = match &tools[0]["function"] {
+                Value::Object(tool) => tool,
+                _ => panic!("Invalid tool call"),
+            };
+            let tool_call_id = match &tools[0]["id"] {
+                Value::String(id) => id,
+                _ => panic!("Tool call id not provided or not string"),
+            };
+            let tool = match &tool_call["name"] {
+                Value::String(name) => name,
+                _ => panic!("Tool name must be a string"),
+            };
+            let args: Value = match &tool_call["arguments"] {
+                Value::String(raw) => serde_json::from_str(raw.as_str()).unwrap(),
+                _ => panic!("Invalid arguments"),
+            };
+            match tool.as_str() {
+                "Read" => {
+                    if let Value::String(path) = &args["file_path"] {
+                        let content = fs::read_to_string(path).unwrap();
+                        messages.push(json!({
+                            "role": "tool",
+                            "tool_call_id": tool_call_id,
+                            "content": content,
+                        }))
+                    } else {
+                        panic!("file_path must be a string")
                     }
                 }
-            ]
-        }))
-        .await?;
-
-    let message = &response["choices"][0]["message"];
-
-    if let Some(tool_calls) = message["tool_calls"].as_array() {
-        for call in tool_calls {
-            let func = &call["function"];
-            let func_name = func["name"].as_str().unwrap_or("");
-            if func_name == "Read" {
-                // Get file_path argument
-                let args_str = func["arguments"].as_str().unwrap_or("{}");
-                let args_json: Value = serde_json::from_str(args_str)?;
-                let file_path = args_json["file_path"].as_str().unwrap_or("");
-
-                // Read file content
-                let content = fs::read_to_string(file_path)
-                    .unwrap_or_else(|_| "Error reading file".to_string());
-
-                // Print content (this is what the test expects)
+                _ => panic!("Tool not implemented"),
+            };
+        } else {
+            if let Some(content) = response["choices"][0]["message"]["content"].as_str() {
                 println!("{}", content);
+                break;
             }
         }
-    } else if let Some(content) = message["content"].as_str() {
-        println!("{}", content);
     }
-    // You can use print statements as follows for debugging, they'll be visible when running tests.
-    eprintln!("Logs from your program will appear here!");
     Ok(())
 }
-
