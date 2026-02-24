@@ -13,8 +13,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
-    println!("OPENROUTER_API_KEY = {}", env::var("OPENROUTER_API_KEY")?);
-    println!("OPENROUTER_BASE_URL = {}", env::var("OPENROUTER_BASE_URL")?);
+
     let args = Args::parse();
 
     let base_url = env::var("OPENROUTER_BASE_URL")
