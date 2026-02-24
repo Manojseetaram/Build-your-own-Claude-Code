@@ -1,8 +1,8 @@
 use async_openai::{Client, config::OpenAIConfig};
 use clap::Parser;
+use dotenv::dotenv;
 use serde_json::{Value, json};
 use std::{env, fs, process};
-
 #[derive(Parser)]
 #[command(author, version, about)]
 struct Args {
@@ -12,6 +12,7 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenv().ok();
     let args = Args::parse();
 
     let base_url = env::var("OPENROUTER_BASE_URL")
