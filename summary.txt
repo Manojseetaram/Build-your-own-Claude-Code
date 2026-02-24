@@ -1,0 +1,1 @@
+This is a Rust project to build an AI coding assistant powered by LLMs with HTTP APIs and tool calling capabilities.
